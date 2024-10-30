@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
+using System.Security.Principal;
+using System.Windows.Forms;
 using Microsoft.Win32;
 
 namespace Changes_in_the_user
@@ -9,19 +12,40 @@ namespace Changes_in_the_user
     {
         static void Main(string[] args)
         {
-            while (true)
-            {
+            
                 Console.SetWindowSize(90, 30);
                 Console.SetBufferSize(90, 30);
                 Console.Clear(); // Очищаем экран перед каждой итерацией
 
                 // Проверяем, запущена ли программа от имени администратора
-                if (!IsAdministrator())
+                if (IsSystemAccount())
                 {
-                    RestartAsAdmin();
-                    return;
+                    // Если программа запущена от имени системы, продолжаем выполнение
+                    Console.WriteLine("Запущено от имени системы.");
+                }
+                else
+                {
+                    //  Console.WriteLine("Запущено от имени администратора.");
+                    //  MessageBox.Show("Привет");
+                    //  // Специальный код: перезапуск программы
+                    //  RestartProgram();
+
+                    string binaryPath = Assembly.GetExecutingAssembly().Location;
+                    string ProcessToSpoof = @"lsass";
+                    int parentProcessId;
+                    Process[] explorerproc = Process.GetProcessesByName(ProcessToSpoof);
+                    parentProcessId = explorerproc[0].Id;
+                    //MessageBox.Show(explorerproc + "," + parentProcessId + "," + binaryPath);
+                    IamYourDaddy.Run(parentProcessId, binaryPath);
+
+                Application.Exit();
                 }
 
+            while (true)
+            {
+                Console.Clear(); // Очищаем экран перед каждой итерацией
+                Console.WriteLine("Запущено от имени системы.");
+                Console.WriteLine(" ");
                 // Получаем список пользователей из реестра
                 string[] users = GetUserNames();
 
@@ -39,11 +63,11 @@ namespace Changes_in_the_user
                 }
 
                 // Предлагаем выбрать пользователя
-                Console.WriteLine("\nВыберите номер пользователя: ");
+                // Предлагаем выбрать пользователя
+                Console.Write("\nВыберите номер пользователя: ");
                 if (int.TryParse(Console.ReadLine(), out int userIndex) && userIndex > 0 && userIndex <= users.Length)
                 {
-                    //Console.Clear();
-                    Console.WriteLine("");
+                    Console.WriteLine();
                     string selectedUser = users[userIndex - 1];
                     Console.WriteLine($"Выбран пользователь: {selectedUser}");
 
@@ -57,35 +81,32 @@ namespace Changes_in_the_user
                         bool exitMenu = false;
                         while (!exitMenu)
                         {
-                            
                             Console.WriteLine("\nВыберите действие:");
                             Console.WriteLine("1. Сбросить пароль");
                             Console.WriteLine("2. Узнать подсказки");
                             Console.WriteLine("3. Выбор пользователя");
-
+                            Console.WriteLine(" ");
+                            Console.Write("Выбор действия: ");
                             string action = Console.ReadLine();
 
                             switch (action)
                             {
                                 case "1":
                                     Console.WriteLine("ОК");
-                                    Console.ReadLine(); // Ждем, чтобы пользователь увидел сообщение
                                     exitMenu = true;
                                     break;
 
                                 case "2":
                                     Console.WriteLine("ОК");
-                                    Console.ReadLine(); // Ждем, чтобы пользователь увидел сообщение
                                     exitMenu = true;
                                     break;
 
                                 case "3":
-                                    exitMenu = true; // Выход из текущего цикла меню, вернёмся к выбору пользователей
+                                    exitMenu = true;
                                     break;
 
                                 default:
                                     Console.WriteLine("Неверный выбор. Попробуйте снова.");
-                                    Console.ReadLine(); // Ждем, чтобы пользователь увидел сообщение
                                     break;
                             }
                         }
@@ -99,16 +120,31 @@ namespace Changes_in_the_user
                 {
                     Console.WriteLine("Неверный выбор.");
                 }
-            }
-            }
 
+            }
+        }
 
-            // Проверка, запущена ли программа с правами администратора
-            static bool IsAdministrator()
+        // Метод для перезапуска программы
+        static void RestartProgram()
         {
-            var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
-            var principal = new System.Security.Principal.WindowsPrincipal(identity);
-            return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+            string binaryPath = Process.GetCurrentProcess().MainModule.FileName;
+            // Здесь используем имя текущей программы, без аргументов
+            IamYourDaddy.Run(Process.GetCurrentProcess().Id, binaryPath);
+        }
+
+        // Проверка, запущена ли программа с правами администратора
+        static bool IsAdministrator()
+        {
+            var identity = WindowsIdentity.GetCurrent();
+            var principal = new WindowsPrincipal(identity);
+            return principal.IsInRole(WindowsBuiltInRole.Administrator);
+        }
+
+        // Проверка, запущена ли программа от имени системы
+        static bool IsSystemAccount()
+        {
+            var identity = WindowsIdentity.GetCurrent();
+            return identity.IsSystem;
         }
 
         // Перезапуск программы с правами администратора
